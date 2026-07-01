@@ -5,6 +5,9 @@
 #include <memory>
 #include <fstream>
 #include <mutex>
+#include <thread>
+#include <chrono>
+#include <ctime>
 
 enum class level {
     trace = 0,
@@ -16,10 +19,226 @@ enum class level {
     off = 6
 };
 
+struct log_msg {
+    std::string logger_name;
+    level lvl;
+    std::string payload;
+    std::chrono::system_clock::time_point time;
+    size_t thread_id;
+};
+
 inline const char* level_name(level lvl) {
     const char* names[] = {"trace", "debug", "info", "warn", "error", "crit", "off"};
     return names[static_cast<int>(lvl)];
 }
+
+inline void pad2(int val, std::string& dest) {
+    dest += static_cast<char>('0' + val / 10);
+    dest += static_cast<char>('0' + val % 10);
+}
+
+inline void pad3(int val, std::string& dest) {
+    dest += static_cast<char>('0' + val / 100);
+    dest += static_cast<char>('0' + (val / 10) % 10);
+    dest += static_cast<char>('0' + val % 10);
+}
+
+class flag_formatter {
+public:
+    virtual ~flag_formatter() = default;
+    virtual void format(const log_msg& msg, const std::tm& tm_time, 
+                        std::string& dest) = 0;
+};
+
+class literal_flag : public flag_formatter {
+    std::string text_;
+public:
+    explicit literal_flag(std::string t) : text_(std::move(t)) {}
+    void format(const log_msg&, const std::tm&, std::string& dest) override {
+        dest += text_;
+    }
+};
+
+class name_flag : public flag_formatter {
+public:
+    void format(const log_msg& msg, const std::tm&, std::string& dest) override {
+        dest += msg.logger_name;
+    }
+};
+
+class level_flag : public flag_formatter {
+public:
+    void format(const log_msg& msg, const std::tm&, std::string& dest) override {
+        dest += level_name(msg.lvl);
+    }
+};
+
+class short_level_flag : public flag_formatter {
+public:
+    void format(const log_msg& msg, const std::tm&, std::string& dest) override {
+        dest += level_name(msg.lvl)[0];
+    }
+};
+
+class message_flag : public flag_formatter {
+public:
+    void format(const log_msg& msg, const std::tm&, std::string& dest) override {
+        dest += msg.payload;
+    }
+};
+
+class thread_flag : public flag_formatter {
+public:
+    void format(const log_msg& msg, const std::tm&, std::string& dest) override {
+        dest += std::to_string(msg.thread_id);
+    }
+};
+
+class year_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm& tm, std::string& dest) override {
+        dest += std::to_string(tm.tm_year + 1900);
+    }
+};
+
+class month_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm& tm, std::string& dest) override {
+        pad2(tm.tm_mon + 1, dest);
+    }
+};
+
+class day_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm& tm, std::string& dest) override {
+        pad2(tm.tm_mday, dest);
+    }
+};
+
+class hour_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm& tm, std::string& dest) override {
+        pad2(tm.tm_hour, dest);
+    }
+};
+
+class min_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm& tm, std::string& dest) override {
+        pad2(tm.tm_min, dest);
+    }
+};
+
+class sec_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm& tm, std::string& dest) override {
+        pad2(tm.tm_sec, dest);
+    }
+};
+
+
+class msec_flag : public flag_formatter {
+public:
+    void format(const log_msg& msg, const std::tm&, std::string& dest) override {
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            msg.time.time_since_epoch()
+        ) % 1000;
+        pad3(static_cast<int>(ms.count()), dest);
+    }
+};
+
+class percent_flag : public flag_formatter {
+public:
+    void format(const log_msg&, const std::tm&, std::string& dest) override {
+        dest += '%';
+    }
+};
+
+class pattern_formatter {
+public:
+    explicit pattern_formatter(std::string pattern = "[%Y-%m-%d %H:%M:%S.%e] [%n] [%l] %v")
+    : pattern_(std::move(pattern)) {
+        compile_pattern_(pattern_);
+    }
+
+    void format(const log_msg& msg, std::string& dest) {
+        std::lock_guard<std::mutex> lock(fmt_mutex_);
+        auto secs = std::chrono::duration_cast<std::chrono::seconds>(
+            msg.time.time_since_epoch()
+        );
+        if (secs != last_log_secs_) {
+            std::time_t t = std::chrono::system_clock::to_time_t(msg.time);
+            localtime_s(&cached_tm_, &t);
+            last_log_secs_ = secs;
+        }
+
+        for (auto& f : formatters_) {
+            f->format(msg, cached_tm_, dest);
+        }
+        dest += '\n';
+    }
+    void set_pattern(std::string pattern) {
+        pattern_ = std::move(pattern);
+        compile_pattern_(pattern_);
+    }
+private:
+    void compile_pattern_(const std::string& pattern) {
+        formatters_.clear();
+        std::string literal;
+
+        for (auto it = pattern.begin(); it != pattern.end(); ++ it) {
+            if (*it == '%' && std::next(it) != pattern.end()) {
+                if (!literal.empty()) {
+                    formatters_.push_back(
+                        std::make_unique<literal_flag>(std::move(literal))
+                    );
+                    literal.clear();
+                }
+                char flag = *++it;
+                formatters_.push_back(create_flag_(flag));
+            } else {
+                literal += *it;
+            }
+        }
+
+        if (!literal.empty()) {
+            formatters_.push_back(
+                std::make_unique<literal_flag>(std::move(literal))
+            );
+        }
+    }
+
+    std::unique_ptr<flag_formatter> create_flag_(char flag) {
+        switch (flag) {
+            case 'n': return std::make_unique<name_flag>();
+            case 'l': return std::make_unique<level_flag>();
+            case 'L': return std::make_unique<short_level_flag>();
+            case 'v': return std::make_unique<message_flag>();
+            case 't': return std::make_unique<thread_flag>();
+            case 'Y': return std::make_unique<year_flag>();
+            case 'm': return std::make_unique<month_flag>();
+            case 'd': return std::make_unique<day_flag>();
+            case 'H': return std::make_unique<hour_flag>();
+            case 'M': return std::make_unique<min_flag>();
+            case 'S': return std::make_unique<sec_flag>();
+            case 'e': return std::make_unique<msec_flag>();
+            case '%': return std::make_unique<percent_flag>();
+            default:
+                return std::make_unique<literal_flag>(
+                    std::string("%") + flag
+                );
+        }
+    }
+
+
+
+    std::string pattern_;
+    std::vector<std::unique_ptr<flag_formatter>> formatters_;
+    std::tm cached_tm_{};
+    std::chrono::seconds last_log_secs_{0};
+    std::mutex fmt_mutex_;
+};
+
 
 struct null_mutex {
     void lock() {}
@@ -65,7 +284,7 @@ protected:
 class stdout_sink : public base_sink<> {
 public:
     void sink_it_(level lvl, const std::string& msg) override {
-        std::cout << "[" << level_name(lvl) << "]" << msg << std::endl;
+        std::cout << msg;
     }
 
     void flush_() override {
@@ -81,7 +300,7 @@ public:
     }
 
     void sink_it_(level lvl, const std::string& msg) override {
-        file_ << "[" << level_name(lvl) << "]" << msg << std::endl;
+        file_ << msg;
     }
 
     void flush_() override {
@@ -94,25 +313,39 @@ private:
 
 class logger {
 public:
-    logger(std::string name, std::shared_ptr<sink> s)
-    : name_(std::move(name)) {
-        sinks_.push_back(std::move(s));
-    }
+    logger(std::string name, std::shared_ptr<sink> s, 
+           std::string pattern = "[%Y-%m-%d %H:%M:%S.%e] [%n] [%l] %v")
+        : name_(std::move(name)),
+          formatter_(std::make_unique<pattern_formatter>(std::move(pattern))) {
+            sinks_.push_back(std::move(s));
+        }
 
     void set_level(level lvl) { level_ = lvl; }
+
+    void set_pattern(std::string p) { formatter_->set_pattern(std::move(p)); }
 
     bool should_log(level msg_level) const {
         return static_cast<int>(msg_level) >= static_cast<int>(level_);
     }
 
-    void log(level lvl, const std::string& msg) {
+    void log(level lvl, const std::string& payload) {
         if (!should_log(lvl)) {
             return ;
         }
 
+        log_msg msg;
+        msg.logger_name = name_;
+        msg.lvl = lvl;
+        msg.payload = payload;
+        msg.time = std::chrono::system_clock::now();
+        msg.thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
+        std::string formatted;
+        formatter_->format(msg, formatted);
+
         for (auto& s : sinks_) {
             if (s->should_log(lvl)) {
-                s->log(lvl, msg);
+                s->log(lvl, formatted);
             }
         }
 
@@ -130,6 +363,7 @@ public:
     void crit(const std::string& msg) { log(level::crit, msg); }
 
 private:
+std::unique_ptr<pattern_formatter> formatter_;
     std::string name_;
     level level_{ level::info };
     std::vector<std::shared_ptr<sink>> sinks_;

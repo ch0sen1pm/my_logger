@@ -4,7 +4,7 @@
 int main() {
     auto file = std::make_shared<file_sink>("test.log");
 
-    logger log("test", file);
+    logger log("test", file, "[%H:%M:%S.%e] [%l] [thread %t] %v");
     log.set_level(level::trace);
 
     std::vector<std::thread> threads;
