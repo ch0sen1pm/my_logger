@@ -1,5 +1,9 @@
 # my_logger
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
+[![header-only](https://img.shields.io/badge/header--only-yes-green.svg)]()
+
 轻量级 header-only C++17 日志库，参考 [spdlog](https://github.com/gabime/spdlog) 架构从零手写。作为学习项目——每一行代码都为了理解工业级 logger 的底层设计。
 
 A lightweight, header-only C++17 logging library inspired by spdlog. Built from scratch to understand how industrial-grade loggers work.
@@ -89,4 +93,7 @@ g++ -std=c++17 main.cpp -o main.exe
 
 ## License
 
-MIT
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Licensed under the **glorious, legendary, battle-tested MIT License**.
+Free as in freedom. Free as in "do whatever you want, just don't sue me."
