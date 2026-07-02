@@ -8,6 +8,35 @@
 #include <thread>
 #include <chrono>
 #include <ctime>
+#include <queue>
+#include <condition_variable>
+
+template <typename T>
+class blocking_queue {
+public:
+    void enqueue(T item) {
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            q_.push(std::move(item));
+        }
+        cv_.notify_one();
+    }
+
+    T dequeue() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        cv_.wait(lock, [this] { return !q_.empty(); });
+        T item = std::move(q_.front());
+        q_.pop();
+        return item;
+    }
+
+private:
+    std::queue<T> q_;
+    std::mutex mtx_;
+    std::condition_variable cv_;
+};
+
+
 
 enum class level {
     trace = 0,
@@ -31,6 +60,11 @@ inline const char* level_name(level lvl) {
     const char* names[] = {"trace", "debug", "info", "warn", "error", "crit", "off"};
     return names[static_cast<int>(lvl)];
 }
+
+struct async_msg {
+    level lvl;
+    std::string formatted;
+};
 
 inline void pad2(int val, std::string& dest) {
     dest += static_cast<char>('0' + val / 10);
@@ -322,11 +356,20 @@ public:
 
     void set_level(level lvl) { level_ = lvl; }
 
+    const std::string& name() const { return name_; }
+
+
+
     void set_pattern(std::string p) { formatter_->set_pattern(std::move(p)); }
+
+    void format(log_msg& msg, std::string& dest) {
+        formatter_->format(msg, dest);
+    }
 
     bool should_log(level msg_level) const {
         return static_cast<int>(msg_level) >= static_cast<int>(level_);
     }
+    
 
     void log(level lvl, const std::string& payload) {
         if (!should_log(lvl)) {
@@ -343,12 +386,17 @@ public:
         std::string formatted;
         formatter_->format(msg, formatted);
 
+        log_formatted(lvl, formatted);
+
+    }
+
+    
+    void log_formatted(level lvl, const std::string& formatted) {
         for (auto& s : sinks_) {
             if (s->should_log(lvl)) {
                 s->log(lvl, formatted);
             }
-        }
-
+        } 
     }
 
     void add_sink(std::shared_ptr<sink> s) {
@@ -363,8 +411,55 @@ public:
     void crit(const std::string& msg) { log(level::crit, msg); }
 
 private:
-std::unique_ptr<pattern_formatter> formatter_;
+    std::unique_ptr<pattern_formatter> formatter_;
     std::string name_;
     level level_{ level::info };
     std::vector<std::shared_ptr<sink>> sinks_;
+};
+
+class async_logger {
+public:
+    async_logger(std::shared_ptr<logger> backend)
+        : backend_(std::move(backend)),
+        worker_(&async_logger::run_, this) {} 
+
+    void log(level lvl, const std::string& payload) {
+        log_msg msg;
+        msg.logger_name = backend_->name();
+        msg.lvl = lvl;
+        msg.payload = payload;
+        msg.time = std::chrono::system_clock::now();
+        msg.thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
+        std::string formatted;
+        backend_->format(msg, formatted);
+
+        async_msg amsg;
+        amsg.lvl = lvl;
+        amsg.formatted = std::move(formatted);
+        q_.enqueue(std::move(amsg));
+    }
+
+    void trace(const std::string& msg) { log(level::trace, msg); }
+    void debug(const std::string& msg) { log(level::debug, msg); }
+    void info(const std::string& msg) { log(level::info, msg); }
+    void warn(const std::string& msg) { log(level::warn, msg); }
+    void error(const std::string& msg) { log(level::err, msg); }
+    void crit(const std::string& msg) { log(level::crit, msg); }
+
+    ~async_logger() {
+        worker_.detach();
+    }
+
+private:
+    void run_() {
+        while (true) {
+            auto msg = q_.dequeue();
+            backend_->log_formatted(msg.lvl, msg.formatted);
+        }
+    }
+
+    std::shared_ptr<logger> backend_;
+    blocking_queue<async_msg> q_;
+    std::thread worker_;
 };

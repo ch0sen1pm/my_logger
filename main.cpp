@@ -2,15 +2,17 @@
 #include <thread>
 
 int main() {
-    auto file = std::make_shared<file_sink>("test.log");
+    auto file = std::make_shared<file_sink>("app.log");
 
-    logger log("test", file, "[%H:%M:%S.%e] [%l] [thread %t] %v");
-    log.set_level(level::trace);
+    auto backend = std::make_shared<logger>("myapp", file);
+    backend->set_level(level::trace);
+
+    async_logger log(backend);
 
     std::vector<std::thread> threads;
-    for (int i = 0; i < 3; i ++) {
+    for (int i = 0; i < 3; i++) {
         threads.emplace_back([&log, i]() {
-            for (int j = 0; j < 10; j ++) {
+            for (int j = 0; j < 10; j++) {
                 log.info("thread_" + std::to_string(i) + std::to_string(j));
             }
         });
@@ -19,7 +21,6 @@ int main() {
     for (auto& t : threads) {
         t.join();
     }
-
 
     return 0;
 }

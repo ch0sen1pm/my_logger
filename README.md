@@ -85,10 +85,13 @@ g++ -std=c++17 main.cpp -o main.exe
 
 ## Roadmap
 
-- [ ] Async logging（线程池 + 无锁队列）
+- [x] Pattern formatter（13 flags + 虚函数分发 + tm 缓存）
+- [x] Async logging（`blocking_queue` + `async_logger` + 后台线程）
+- [ ] Graceful shutdown（`atomic<bool>` + 优雅关闭 worker 线程）
+- [ ] Thread pool（N 个 worker 线程共享队列）
 - [ ] 编译期日志级别过滤（compile-time level filter）
-- [ ] Rotating file sink（按大小/时间切日志）
 - [ ] Registry（全局 logger 注册表）
+- [ ] Rotating file sink（按大小/时间切日志）
 - [ ] Benchmark
 
 ## License
