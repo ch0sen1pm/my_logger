@@ -10,6 +10,7 @@
 #include <ctime>
 #include <queue>
 #include <condition_variable>
+#include <optional>
 
 template <typename T>
 class blocking_queue {
@@ -22,18 +23,30 @@ public:
         cv_.notify_one();
     }
 
-    T dequeue() {
+    std::optional<T> dequeue() {
         std::unique_lock<std::mutex> lock(mtx_);
-        cv_.wait(lock, [this] { return !q_.empty(); });
+        cv_.wait(lock, [this] { return !q_.empty() || stopped_; });
+        if (stopped_ && q_.empty()) {
+            return std::nullopt;
+        }
         T item = std::move(q_.front());
         q_.pop();
         return item;
+    }
+
+    void stop() {
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            stopped_ = true;
+        }
+        cv_.notify_all();
     }
 
 private:
     std::queue<T> q_;
     std::mutex mtx_;
     std::condition_variable cv_;
+    bool stopped_ = false;
 };
 
 
@@ -448,14 +461,18 @@ public:
     void crit(const std::string& msg) { log(level::crit, msg); }
 
     ~async_logger() {
-        worker_.detach();
+        q_.stop();
+        worker_.join();
     }
 
 private:
     void run_() {
         while (true) {
             auto msg = q_.dequeue();
-            backend_->log_formatted(msg.lvl, msg.formatted);
+            if (!msg) {
+                break;
+            }
+            backend_->log_formatted(msg->lvl, msg->formatted);
         }
     }
 
