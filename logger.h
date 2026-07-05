@@ -11,6 +11,7 @@
 #include <queue>
 #include <condition_variable>
 #include <optional>
+#include <unordered_map>
 
 template <typename T>
 class blocking_queue {
@@ -484,4 +485,32 @@ private:
     std::shared_ptr<logger> backend_;
     blocking_queue<async_msg> q_;
     std::vector<std::thread> workers_;
+};
+
+class registry {
+public:
+    static registry& instance() {
+        static registry r;
+        return r;
+    }
+
+    void register_logger(std::shared_ptr<logger> log) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        loggers_[log->name()] = std::move(log);
+    }
+
+    std::shared_ptr<logger> get(const std::string& name) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto it = loggers_.find(name);
+        if (it != loggers_.end()) {
+            return it->second;
+        }
+
+        return nullptr;
+    }
+
+private:
+    registry() = default;
+    std::unordered_map<std::string, std::shared_ptr<logger>> loggers_;
+    std::mutex mtx_;
 };
