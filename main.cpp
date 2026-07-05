@@ -7,7 +7,7 @@ int main() {
     auto backend = std::make_shared<logger>("myapp", file);
     backend->set_level(level::trace);
 
-    async_logger log(backend);
+    async_logger log(backend, 3);  // 3 workers
 
     std::vector<std::thread> threads;
     for (int i = 0; i < 3; i++) {

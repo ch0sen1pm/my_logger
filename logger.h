@@ -432,9 +432,12 @@ private:
 
 class async_logger {
 public:
-    async_logger(std::shared_ptr<logger> backend)
-        : backend_(std::move(backend)),
-        worker_(&async_logger::run_, this) {} 
+    async_logger(std::shared_ptr<logger> backend, size_t n_threads = 1)
+        : backend_(std::move(backend)) {
+            for (size_t i = 0; i < n_threads; i ++) {
+                workers_.emplace_back(&async_logger::run_, this);
+            }
+        } 
 
     void log(level lvl, const std::string& payload) {
         log_msg msg;
@@ -462,7 +465,9 @@ public:
 
     ~async_logger() {
         q_.stop();
-        worker_.join();
+        for (auto& t : workers_) {
+            t.join();
+        }
     }
 
 private:
@@ -478,5 +483,5 @@ private:
 
     std::shared_ptr<logger> backend_;
     blocking_queue<async_msg> q_;
-    std::thread worker_;
+    std::vector<std::thread> workers_;
 };
