@@ -1,20 +1,17 @@
 #include "logger.h"
-#include <thread>
 
 int main() {
-    auto file = std::make_shared<file_sink>("app.log");
+    auto rs = std::make_shared<rotating_file_sink>("app", 100);  // 100字节就切
 
-    auto backend = std::make_shared<logger>("myapp", file);
-    backend->set_level(level::info);  // trace/debug 会被过滤
-    registry::instance().register_logger(backend);
+    logger log("myapp", rs);
+    log.set_level(level::trace);
 
-    auto log = registry::instance().get("myapp");
-
-    // 宏 — 参数都不会构造如果被过滤
-    LOG_TRACE(log, "this will NOT run");    // trace < info → 被过滤
-    LOG_DEBUG(log, "this will NOT run");    // debug < info → 被过滤
-    LOG_INFO(log, "hello from macro!");
-    LOG_WARN(log, "warning from macro!");
+    // 每条约40字节 → 写3条就会切一次
+    log.info("hello world! this is a test message number 1");
+    log.info("hello world! this is a test message number 2");
+    log.info("hello world! this is a test message number 3");
+    log.info("hello world! this is a test message number 4");
+    log.info("hello world! this is a test message number 5");
 
     return 0;
 }

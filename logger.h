@@ -359,6 +359,55 @@ private:
     std::ofstream file_;
 };
 
+class rotating_file_sink : public base_sink<std::mutex> {
+public:
+    rotating_file_sink(const std::string& base_name, size_t max_size = 1024 * 1024)
+        : base_name_(base_name), max_size_(max_size) {
+            open_new_file_();
+        }
+
+    void sink_it_(level lvl, const std::string& msg) override {
+        file_ << msg;
+        bytes_written_ += msg.size();
+
+        if (bytes_written_ >= max_size_) {
+            file_.close();
+            rotate_();
+            bytes_written_ = 0;
+            open_new_file_();
+        }
+    }
+
+    void flush_() override {
+        file_ << std::flush;
+    }
+
+private:
+    void open_new_file_() {
+        file_.open(base_name_ + ".log", std::ios::app);
+    }
+
+    void rotate_() {
+        auto now = std::chrono::system_clock::now();
+        auto t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm_buf;
+        localtime_s(&tm_buf, &t);
+        char ts[32];
+        std::strftime(ts, sizeof(ts), "%Y%m%d-%H%M%S", &tm_buf);
+
+        auto old = base_name_ + ".log";
+        auto rotated = base_name_ + "_" + ts + ".log";
+        std::rename(old.c_str(), rotated.c_str());
+    }
+
+    std::string base_name_;
+    size_t max_size_;
+    size_t bytes_written_ = 0;
+    std::ofstream file_;
+};
+
+
+
 class logger {
 public:
     logger(std::string name, std::shared_ptr<sink> s, 
