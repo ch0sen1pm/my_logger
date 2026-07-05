@@ -87,12 +87,12 @@ g++ -std=c++17 main.cpp -o main.exe
 
 - [x] Pattern formatter（13 flags + 虚函数分发 + tm 缓存）
 - [x] Async logging（`blocking_queue` + `async_logger` + 后台线程）
-- [ ] Graceful shutdown（`atomic<bool>` + 优雅关闭 worker 线程）
-- [ ] Thread pool（N 个 worker 线程共享队列）
-- [ ] 编译期日志级别过滤（compile-time level filter）
-- [ ] Registry（全局 logger 注册表）
-- [ ] Rotating file sink（按大小/时间切日志）
-- [ ] Benchmark
+- [x] Graceful shutdown（`stop()` + `join()` 优雅关闭）
+- [x] Thread pool（N 个 worker 线程共享队列）
+- [x] 编译期日志级别过滤（`LOG_TRACE/DEBUG/INFO/WARN/ERROR/CRIT` 宏）
+- [x] Registry（全局单例注册表）
+- [x] Rotating file sink（按文件大小自动切日志）
+- [x] Benchmark（2M msg/s 同步吞吐）
 
 ## License
 
