@@ -13,6 +13,15 @@
 #include <optional>
 #include <unordered_map>
 
+
+inline void localtime_platform(const std::time_t* t, std::tm* tm) {
+#ifdef _WIN32
+    localtime_s(tm, t);
+#else
+    localtime_r(t, tm);
+#endif
+}
+
 template <typename T>
 class blocking_queue {
 public:
@@ -216,7 +225,7 @@ public:
         );
         if (secs != last_log_secs_) {
             std::time_t t = std::chrono::system_clock::to_time_t(msg.time);
-            localtime_s(&cached_tm_, &t);
+            localtime_platform(&t, &cached_tm_);
             last_log_secs_ = secs;
         }
 
@@ -391,7 +400,7 @@ private:
         auto now = std::chrono::system_clock::now();
         auto t = std::chrono::system_clock::to_time_t(now);
         std::tm tm_buf;
-        localtime_s(&tm_buf, &t);
+        localtime_platform(&t, &tm_buf);
         char ts[32];
         std::strftime(ts, sizeof(ts), "%Y%m%d-%H%M%S", &tm_buf);
 

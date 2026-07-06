@@ -3,3 +3,4 @@
 *.exe?
 main.exe
 *.exe、
+build/
