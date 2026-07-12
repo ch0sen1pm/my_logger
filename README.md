@@ -10,7 +10,7 @@ A lightweight, header-only C++17 logging library inspired by spdlog. Built from 
 
 ## Features
 
-- **Header-only** — 单文件 `logger.h`，拖进项目就能用
+- **Header-only** — 全头文件库，`#include "logger.h"` 即可
 - **7 log levels** — `trace / debug / info / warn / error / crit / off`
 - **Custom pattern** — 自定义格式串，支持 13 个 flag
 - **Multiple sinks** — `stdout_sink` / `file_sink`，可扩展自定义 sink
@@ -93,6 +93,13 @@ g++ -std=c++17 main.cpp -o main.exe
 - [x] Registry（全局单例注册表）
 - [x] Rotating file sink（按文件大小自动切日志）
 - [x] Benchmark（2M msg/s 同步吞吐）
+- [ ] Color stdout sink（按级别着色：error 红、warn 黄、info 绿）
+- [ ] Daily rolling sink（按天切分日志文件）
+- [ ] Flush on crash（SIGSEGV 信号捕获，崩溃前刷日志）
+- [ ] Logger hierarchy（父子 logger 继承 level/sink）
+- [ ] Rate limiter（相同日志 N 秒内去重，防刷屏）
+- [ ] JSON config（JSON 文件初始化 logger）
+- [ ] Benchmark vs spdlog（性能对比 + 表格）
 
 ## License
 
