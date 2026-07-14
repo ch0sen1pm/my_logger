@@ -146,3 +146,43 @@ private:
     size_t bytes_written_ = 0;
     std::ofstream file_;
 };
+
+/**
+ * 带 ANSI 颜色的控制台 Sink
+ *
+ * 原理：在消息前后嵌入 ANSI 转义码（\033[XXm），
+ * 终端看到这些码不会打印字符，而是切换前景色。
+ * \033[0m 表示复位颜色，防止后续输出被染色。
+ *
+ * 颜色映射：
+ *   trace = 灰, debug = 青, info = 绿, warn = 黄, error = 红, crit = 亮红
+ *
+ * 注意：Windows 传统 cmd 不支持 ANSI，Linux/Mac/WSL 正常显示。
+ */
+class color_stdout_sink : public base_sink<> {
+public:
+    /** 着色 → 输出消息 → 复位 */
+    void sink_it_(level lvl, const std::string& msg) override {
+        std::cout << color_code_(lvl)
+                  << msg
+                  << "\033[0m";
+    }
+
+    void flush_() override {
+        std::cout << std::flush;
+    }
+
+private:
+    /** @return 日志级别对应的 ANSI 前景色码 */
+    const char* color_code_(level lvl) const {
+        switch(lvl) {
+            case level::trace: return "\033[90m";  // 灰
+            case level::debug: return "\033[36m";  // 青
+            case level::info:  return "\033[32m";  // 绿
+            case level::warn:  return "\033[33m";  // 黄
+            case level::err:   return "\033[31m";  // 红
+            case level::crit:  return "\033[91m";  // 亮红
+            default:           return "";
+        }
+    }
+};
