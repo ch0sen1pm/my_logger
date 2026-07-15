@@ -148,6 +148,67 @@ private:
 };
 
 /**
+ * 按天切分日志文件
+ *
+ * 每次写入前检查日期是否变化。跨天了就关掉昨天的文件，
+ * 用新日期开一个新文件（如 chat_20260715.log）。
+ * 比 rotating_file_sink 更简单——不需要比较文件大小，
+ * 只需要比较日期字符串。
+ */
+class daily_rolling_sink : public base_sink<std::mutex> {
+public:
+    /** @param base_name 日志文件前缀，如 "chat" → chat_20260715.log */
+    daily_rolling_sink(const std::string& base_name)
+        : base_name_(base_name) {
+        last_date_ = today_();
+        open_new_file_();
+    }
+
+    /** 写消息前先检查是否跨天，跨天了就切文件 */
+    void sink_it_(level lvl, const std::string& msg) override {
+        std::string today = today_();
+
+        if (today != last_date_) {
+            file_.close();     // 关旧文件
+            last_date_ = today;
+            open_new_file_();   // 开新文件
+        }
+        file_ << msg;
+        file_ << std::flush;    // 每条刷盘，调试用
+    }
+
+    void flush_() override {
+        file_ << std::flush;
+    }
+
+private:
+    void open_new_file_() {
+        file_.open(file_name_(last_date_), std::ios::app);
+    }
+
+
+    std::string today_() const {
+        auto now = std::chrono::system_clock::now();
+        auto t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm_buf;
+        localtime_platform(&t, &tm_buf);
+        char buf[16];
+        std::strftime(buf, sizeof(buf), "%Y%m%d", &tm_buf);
+        return buf;
+    }
+
+    std::string file_name_(const std::string& date) const {
+        return base_name_ + "_" + date + ".log";
+    }
+
+    std::string base_name_;
+    std::string last_date_;
+    std::ofstream file_;
+};
+
+
+
+/**
  * 带 ANSI 颜色的控制台 Sink
  *
  * 原理：在消息前后嵌入 ANSI 转义码（\033[XXm），

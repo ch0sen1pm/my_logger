@@ -94,7 +94,7 @@ g++ -std=c++17 main.cpp -o main.exe
 - [x] Rotating file sink（按文件大小自动切日志）
 - [x] Benchmark（2M msg/s 同步吞吐）
 - [x] Color stdout sink（ANSI 转义码，按级别着色：error 红、warn 黄、info 绿）
-- [ ] Daily rolling sink（按天切分日志文件）
+- [x] Daily rolling sink（按天切分日志文件，跨天自动创建新文件）
 - [ ] Flush on crash（SIGSEGV 信号捕获，崩溃前刷日志）
 - [ ] Logger hierarchy（父子 logger 继承 level/sink）
 - [ ] Rate limiter（相同日志 N 秒内去重，防刷屏）
