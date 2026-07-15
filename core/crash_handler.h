@@ -49,7 +49,7 @@ private:
             s->flush();
         }
         signal(sig, SIG_DFL);   // 恢复默认处理
-        raise(sig);              // 再发一次信号，让进程正常死
+        raise(sig);              // 再发一次，让进程正常死
     }
 
     std::vector<std::shared_ptr<sink>> sinks_;
