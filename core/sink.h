@@ -174,7 +174,6 @@ public:
             open_new_file_();   // 开新文件
         }
         file_ << msg;
-        file_ << std::flush;    // 每条刷盘，调试用
     }
 
     void flush_() override {
