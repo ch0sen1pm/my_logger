@@ -96,7 +96,7 @@ g++ -std=c++17 main.cpp -o main.exe
 - [x] Color stdout sink（ANSI 转义码，按级别着色：error 红、warn 黄、info 绿）
 - [x] Daily rolling sink（按天切分日志文件，跨天自动创建新文件）
 - [x] Flush on crash（SIGSEGV/SIGABRT/SIGINT 信号捕获，崩溃前刷盘）
-- [ ] Logger hierarchy（父子 logger 继承 level/sink）
+- [x] Logger hierarchy（父子 logger 名字分层，子继承 level/sink）
 - [x] Rate limiter（相同日志 N 秒内去重，unordered_map + steady_clock）
 - [ ] JSON config（JSON 文件初始化 logger）
 - [ ] Benchmark vs spdlog（性能对比 + 表格）
