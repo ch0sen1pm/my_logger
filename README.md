@@ -97,7 +97,7 @@ g++ -std=c++17 main.cpp -o main.exe
 - [x] Daily rolling sink（按天切分日志文件，跨天自动创建新文件）
 - [x] Flush on crash（SIGSEGV/SIGABRT/SIGINT 信号捕获，崩溃前刷盘）
 - [ ] Logger hierarchy（父子 logger 继承 level/sink）
-- [ ] Rate limiter（相同日志 N 秒内去重，防刷屏）
+- [x] Rate limiter（相同日志 N 秒内去重，unordered_map + steady_clock）
 - [ ] JSON config（JSON 文件初始化 logger）
 - [ ] Benchmark vs spdlog（性能对比 + 表格）
 
