@@ -33,6 +33,23 @@ public:
         return nullptr;
     }
 
+    std::shared_ptr<logger> create(const std::string& name,
+                                    std::shared_ptr<sink> s) {
+        auto log = std::make_shared<logger>(name, std::move(s));
+
+        auto pos = name.rfind('.');
+        if (pos != std::string::npos) {
+            std::string parent_name = name.substr(0, pos);
+            auto parent = get(parent_name);
+            if (parent) {
+                log->set_parent(parent);
+            }
+        }
+
+        register_logger(log);
+        return log;
+    }
+
 private:
     registry() = default;
     std::unordered_map<std::string, std::shared_ptr<logger>> loggers_;
