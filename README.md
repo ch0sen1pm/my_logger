@@ -98,7 +98,7 @@ g++ -std=c++17 main.cpp -o main.exe
 - [x] Flush on crash（SIGSEGV/SIGABRT/SIGINT 信号捕获，崩溃前刷盘）
 - [x] Logger hierarchy（父子 logger 名字分层，子继承 level/sink）
 - [x] Rate limiter（相同日志 N 秒内去重，unordered_map + steady_clock）
-- [ ] JSON config（JSON 文件初始化 logger）
+- [x] JSON config（JSON 文件批量创建 logger，nlohmann/json）
 - [x] Benchmark vs spdlog — 100K 条：353K msg/s vs 26K msg/s（13x 更快）
 
 ## License

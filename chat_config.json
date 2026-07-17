@@ -1,0 +1,11 @@
+{
+  "app": {
+    "level": "info",
+    "pattern": "[%H:%M:%S] %v",
+    "sinks": ["daily:chat"]
+  },
+  "app.chat": {
+    "level": "info",
+    "sinks": ["stdout", "daily:chat"]
+  }
+}
