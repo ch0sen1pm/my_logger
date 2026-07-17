@@ -85,7 +85,6 @@ public:
     }
     void sink_it_(level lvl, const std::string& msg) override {
         file_ << msg;
-        file_ << std::flush;  // 每条立即刷盘（调试用，生产可关）
     }
     void flush_() override {
         file_ << std::flush;
